@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Pessoas</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; color: #333; }
+        h1 { font-size: 24px; }
+        h2 { font-size: 18px; margin-top: 30px; }
+        form, .login { display: flex; flex-wrap: wrap; gap: 8px; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 14px; border: none; border-radius: 4px; background: #1f6feb; color: #fff; cursor: pointer; }
+        button.excluir { background: #d73a49; }
+        button.secundario { background: #6a737d; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+        #mensagem { margin-top: 10px; font-size: 14px; }
+        .erro { color: #d73a49; }
+        .ok { color: #22863a; }
+    </style>
+</head>
+<body>
+
+<h1>Cadastro de Pessoas</h1>
+
+<h2>Nova pessoa</h2>
+<form id="form">
+    <input id="documento" placeholder="Documento (11 números)" maxlength="11" required>
+    <input id="nome" placeholder="Nome" required>
+    <input id="sobrenome" placeholder="Sobrenome" required>
+    <input id="email" type="email" placeholder="E-mail" required>
+    <button type="submit">Cadastrar</button>
+</form>
+<div id="mensagem"></div>
+
+<h2>Login (necessário para excluir)</h2>
+<div class="login">
+    <input id="usuario" placeholder="Usuário">
+    <input id="senha" type="password" placeholder="Senha">
+</div>
+
+<h2>Pessoas cadastradas</h2>
+<table>
+    <thead>
+    <tr><th>Documento</th><th>Nome</th><th>E-mail</th><th>Nacionalidade</th><th></th></tr>
+    </thead>
+    <tbody id="lista"></tbody>
+</table>
+
+<script>
+    const msg = document.getElementById('mensagem');
+
+    function mostrar(texto, tipo) {
+        msg.textContent = texto;
+        msg.className = tipo;
+    }
+
+    async function lerErro(resp) {
+        try {
+            const json = await resp.json();
+            return json.erros ? json.erros.join(', ') : 'Erro ' + resp.status;
+        } catch (e) {
+            return 'Erro ' + resp.status;
+        }
+    }
+
+    async function carregar() {
+        const resp = await fetch('/list');
+        const pessoas = await resp.json();
+        const tbody = document.getElementById('lista');
+        tbody.innerHTML = '';
+
+        pessoas.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${p.documento}</td>
+                <td>${p.nome} ${p.sobrenome}</td>
+                <td>${p.email}</td>
+                <td id="nac-${p.documento}">-</td>
+                <td>
+                    <button class="secundario" onclick="nacionalidade('${p.documento}')">Ver</button>
+                    <button class="excluir" onclick="excluir('${p.documento}')">Excluir</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pessoa = {
+            documento: documento.value,
+            nome: nome.value,
+            sobrenome: sobrenome.value,
+            email: email.value
+        };
+
+        const resp = await fetch('/registrarName', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pessoa)
+        });
+
+        if (resp.ok) {
+            mostrar('Pessoa cadastrada com sucesso', 'ok');
+            e.target.reset();
+            carregar();
+        } else {
+            mostrar(await lerErro(resp), 'erro');
+        }
+    });
+
+    async function nacionalidade(doc) {
+        const celula = document.getElementById('nac-' + doc);
+        celula.textContent = 'consultando...';
+        const resp = await fetch('/findNacionalityByPerson/' + doc);
+        if (resp.ok) {
+            const n = await resp.json();
+            celula.textContent = n.codigoPais
+                ? `${n.pais} (${(n.probabilidade * 100).toFixed(1)}%)`
+                : n.pais;
+        } else {
+            celula.textContent = await lerErro(resp);
+        }
+    }
+
+    async function excluir(doc) {
+        const auth = btoa(usuario.value + ':' + senha.value);
+        const resp = await fetch('/list/' + doc, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Basic ' + auth }
+        });
+
+        if (resp.status === 204) {
+            mostrar('Pessoa excluída', 'ok');
+            carregar();
+        } else if (resp.status === 401) {
+            mostrar('Usuário ou senha inválidos', 'erro');
+        } else {
+            mostrar(await lerErro(resp), 'erro');
+        }
+    }
+
+    carregar();
+</script>
+</body>
+</html>
