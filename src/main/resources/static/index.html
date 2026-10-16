@@ -77,11 +77,13 @@
                 <td>${p.documento}</td>
                 <td>${p.nome} ${p.sobrenome}</td>
                 <td>${p.email}</td>
-                <td id="nac-${p.documento}">-</td>
+                <td class="nac">-</td>
                 <td>
-                    <button class="secundario" onclick="nacionalidade('${p.documento}')">Ver</button>
-                    <button class="excluir" onclick="excluir('${p.documento}')">Excluir</button>
+                    <button type="button" class="secundario btn-ver">Ver</button>
+                    <button type="button" class="excluir btn-excluir">Excluir</button>
                 </td>`;
+            tr.querySelector('.btn-ver').addEventListener('click', () => nacionalidade(p.documento, tr.querySelector('.nac')));
+            tr.querySelector('.btn-excluir').addEventListener('click', () => excluir(p.documento));
             tbody.appendChild(tr);
         });
     }
@@ -89,10 +91,10 @@
     document.getElementById('form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const pessoa = {
-            documento: documento.value,
-            nome: nome.value,
-            sobrenome: sobrenome.value,
-            email: email.value
+            documento: document.getElementById('documento').value,
+            nome: document.getElementById('nome').value,
+            sobrenome: document.getElementById('sobrenome').value,
+            email: document.getElementById('email').value
         };
 
         const resp = await fetch('/registrarName', {
@@ -110,22 +112,27 @@
         }
     });
 
-    async function nacionalidade(doc) {
-        const celula = document.getElementById('nac-' + doc);
+    async function nacionalidade(doc, celula) {
         celula.textContent = 'consultando...';
-        const resp = await fetch('/findNacionalityByPerson/' + doc);
-        if (resp.ok) {
-            const n = await resp.json();
-            celula.textContent = n.codigoPais
-                ? `${n.pais} (${(n.probabilidade * 100).toFixed(1)}%)`
-                : n.pais;
-        } else {
-            celula.textContent = await lerErro(resp);
+        try {
+            const resp = await fetch('/findNacionalityByPerson/' + doc);
+            if (resp.ok) {
+                const n = await resp.json();
+                celula.textContent = n.codigoPais
+                    ? `${n.pais} (${(n.probabilidade * 100).toFixed(1)}%)`
+                    : n.pais;
+            } else {
+                celula.textContent = await lerErro(resp);
+            }
+        } catch (e) {
+            celula.textContent = 'Erro ao consultar';
         }
     }
 
     async function excluir(doc) {
-        const auth = btoa(usuario.value + ':' + senha.value);
+        const usuario = document.getElementById('usuario').value;
+        const senha = document.getElementById('senha').value;
+        const auth = btoa(usuario + ':' + senha);
         const resp = await fetch('/list/' + doc, {
             method: 'DELETE',
             headers: { 'Authorization': 'Basic ' + auth }

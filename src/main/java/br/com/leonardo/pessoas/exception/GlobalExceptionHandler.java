@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> body(MethodArgumentNotValidException ex) {
         List<String> erros = ex.getBindingResult().getFieldErrors().stream()
-                .map(e -> e.getField() + ": " + e.getDefaultMessage())
+                .map(e -> e.getDefaultMessage())
                 .toList();
         return erro(HttpStatus.BAD_REQUEST, erros);
     }
